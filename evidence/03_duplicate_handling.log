@@ -1,0 +1,73 @@
+# Demo 3: duplicate handling (shared processed_events.txt, keyed by event_id)
+
+## Part A: the producer publishes order-0001..0004, then re-publishes order-0001
+## with the SAME event_id. The copy must be detected and the business action skipped.
+
+===== Part A merged timeline =====
+22:05:23.077 [worker-2 pid=2527] waiting for messages on queue 'orders' (Ctrl+C to stop)
+22:05:23.078 [worker-1 pid=2526] waiting for messages on queue 'orders' (Ctrl+C to stop)
+22:05:25.113 [producer] published {"event_id": "f7e74fc5-3b08-427b-87cd-5c527d9ce7c4", "order_id": "order-0001", "item_id": "item-100", "quantity": 3}
+22:05:25.113 [worker-2 pid=2527] RECEIVED  event_id=f7e74fc5-3b08-427b-87cd-5c527d9ce7c4 order_id=order-0001 item_id=item-100 qty=3
+22:05:25.114 [worker-2 pid=2527] PROCESSING order_id=order-0001 item_id=item-100 qty=3 ...
+22:05:25.116 [worker-1 pid=2526] RECEIVED  event_id=a2fbca3b-d542-4c2b-95ac-8e6a1f7243fb order_id=order-0002 item_id=item-200 qty=4
+22:05:25.117 [worker-1 pid=2526] PROCESSING order_id=order-0002 item_id=item-200 qty=4 ...
+22:05:25.118 [producer] published {"event_id": "a2fbca3b-d542-4c2b-95ac-8e6a1f7243fb", "order_id": "order-0002", "item_id": "item-200", "quantity": 4}
+22:05:25.120 [producer] published {"event_id": "de09323a-4070-453e-90b0-bb5f97b50ca9", "order_id": "order-0003", "item_id": "item-400", "quantity": 3}
+22:05:25.122 [producer] published {"event_id": "f5ae9f89-c1e5-45f6-a74f-ac8a329ee57e", "order_id": "order-0004", "item_id": "item-200", "quantity": 1}
+22:05:25.123 [producer] published (DUPLICATE of first order) {"event_id": "f7e74fc5-3b08-427b-87cd-5c527d9ce7c4", "order_id": "order-0001", "item_id": "item-100", "quantity": 3}
+22:05:25.123 [producer] done: 5 message(s) published to queue 'orders'
+22:05:26.120 [worker-1 pid=2526] DONE      order_id=order-0002 processed
+22:05:26.120 [worker-1 pid=2526] ACK       event_id=a2fbca3b-d542-4c2b-95ac-8e6a1f7243fb
+22:05:26.120 [worker-2 pid=2527] DONE      order_id=order-0001 processed
+22:05:26.120 [worker-2 pid=2527] ACK       event_id=f7e74fc5-3b08-427b-87cd-5c527d9ce7c4
+22:05:26.121 [worker-1 pid=2526] RECEIVED  event_id=f5ae9f89-c1e5-45f6-a74f-ac8a329ee57e order_id=order-0004 item_id=item-200 qty=1
+22:05:26.121 [worker-2 pid=2527] RECEIVED  event_id=de09323a-4070-453e-90b0-bb5f97b50ca9 order_id=order-0003 item_id=item-400 qty=3
+22:05:26.122 [worker-1 pid=2526] PROCESSING order_id=order-0004 item_id=item-200 qty=1 ...
+22:05:26.122 [worker-2 pid=2527] PROCESSING order_id=order-0003 item_id=item-400 qty=3 ...
+22:05:27.126 [worker-1 pid=2526] DONE      order_id=order-0004 processed
+22:05:27.126 [worker-1 pid=2526] ACK       event_id=f5ae9f89-c1e5-45f6-a74f-ac8a329ee57e
+22:05:27.127 [worker-1 pid=2526] RECEIVED  event_id=f7e74fc5-3b08-427b-87cd-5c527d9ce7c4 order_id=order-0001 item_id=item-100 qty=3
+22:05:27.127 [worker-1 pid=2526] DUPLICATE event_id=f7e74fc5-3b08-427b-87cd-5c527d9ce7c4 already processed -> skipping business action
+22:05:27.127 [worker-1 pid=2526] ACK       event_id=f7e74fc5-3b08-427b-87cd-5c527d9ce7c4 (duplicate discarded)
+22:05:27.127 [worker-2 pid=2527] DONE      order_id=order-0003 processed
+22:05:27.128 [worker-2 pid=2527] ACK       event_id=de09323a-4070-453e-90b0-bb5f97b50ca9
+
+===== Part A summary =====
+messages published:            5
+business actions executed:     4
+duplicates detected/skipped:   1
+
+===== processed_events.txt after Part A =====
+a2fbca3b-d542-4c2b-95ac-8e6a1f7243fb
+f7e74fc5-3b08-427b-87cd-5c527d9ce7c4
+f5ae9f89-c1e5-45f6-a74f-ac8a329ee57e
+de09323a-4070-453e-90b0-bb5f97b50ca9
+
+## Part B: the real-world cause of duplicates. worker-1 (sole consumer) processes
+## order-0005 and records its event_id, then crashes BEFORE the ACK reaches the broker.
+## RabbitMQ redelivers order-0005 to worker-2, which must detect it as a duplicate.
+
+===== Part B merged timeline =====
+22:05:29.666 [worker-1 pid=2681] waiting for messages on queue 'orders' (Ctrl+C to stop)
+22:05:31.686 [worker-1 pid=2681] RECEIVED  event_id=7c2fd731-1c71-40a9-a5cf-ebd77cc904a1 order_id=order-0005 item_id=item-500 qty=3
+22:05:31.686 [worker-1 pid=2681] PROCESSING order_id=order-0005 item_id=item-500 qty=3 ...
+22:05:31.687 [producer] published {"event_id": "7c2fd731-1c71-40a9-a5cf-ebd77cc904a1", "order_id": "order-0005", "item_id": "item-500", "quantity": 3}
+22:05:31.687 [producer] done: 1 message(s) published to queue 'orders'
+22:05:32.115 [worker-2 pid=2690] waiting for messages on queue 'orders' (Ctrl+C to stop)
+22:05:32.692 [worker-1 pid=2681] DONE      order_id=order-0005 processed
+22:05:32.692 [worker-1 pid=2681] SIMULATED CRASH: work done but exiting before ACK for event_id=7c2fd731-1c71-40a9-a5cf-ebd77cc904a1 (redelivery will be a duplicate)
+22:05:32.695 [worker-2 pid=2690] RECEIVED  event_id=7c2fd731-1c71-40a9-a5cf-ebd77cc904a1 order_id=order-0005 item_id=item-500 qty=3  [REDELIVERED]
+22:05:32.696 [worker-2 pid=2690] DUPLICATE event_id=7c2fd731-1c71-40a9-a5cf-ebd77cc904a1 already processed -> skipping business action
+22:05:32.697 [worker-2 pid=2690] ACK       event_id=7c2fd731-1c71-40a9-a5cf-ebd77cc904a1 (duplicate discarded)
+
+===== Part B summary =====
+order-0005 deliveries:          2
+order-0005 business action ran: 1 time(s)
+duplicate detected by:          worker-2
+
+===== processed_events.txt after Part B =====
+a2fbca3b-d542-4c2b-95ac-8e6a1f7243fb
+f7e74fc5-3b08-427b-87cd-5c527d9ce7c4
+f5ae9f89-c1e5-45f6-a74f-ac8a329ee57e
+de09323a-4070-453e-90b0-bb5f97b50ca9
+7c2fd731-1c71-40a9-a5cf-ebd77cc904a1

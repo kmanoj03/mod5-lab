@@ -3,6 +3,7 @@
 Usage:
     python producer.py                    # publish 10 orders
     python producer.py --count 20         # publish 20 orders
+    python producer.py --count 4 --start 11   # order-0011 .. order-0014
     python producer.py --duplicate        # also re-publish the first order (same event_id)
 """
 import argparse
@@ -17,9 +18,10 @@ import config
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [producer] %(message)s",
+    format="%(asctime)s.%(msecs)03d [producer] %(message)s",
     datefmt="%H:%M:%S",
 )
+logging.getLogger("pika").setLevel(logging.WARNING)
 log = logging.getLogger("producer")
 
 ITEMS = ["item-100", "item-200", "item-300", "item-400", "item-500"]
@@ -50,6 +52,7 @@ def publish(channel, order: dict, tag: str = "") -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Publish order messages to RabbitMQ")
     parser.add_argument("--count", type=int, default=10, help="number of orders to publish")
+    parser.add_argument("--start", type=int, default=1, help="first order number (order-NNNN)")
     parser.add_argument(
         "--duplicate",
         action="store_true",
@@ -64,7 +67,7 @@ def main() -> None:
     channel.confirm_delivery()  # broker confirms each publish; raises if it is not routed/accepted
 
     first_order = None
-    for n in range(1, args.count + 1):
+    for n in range(args.start, args.start + args.count):
         order = make_order(n)
         first_order = first_order or order
         publish(channel, order)

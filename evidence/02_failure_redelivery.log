@@ -1,0 +1,71 @@
+# Demo 2: worker dies after receiving a message but before ACK
+# worker-1 is the only consumer when 3 orders are published, so it receives order-0001.
+# It is started with --crash-before-ack and exits mid-processing without ACKing.
+# worker-2 is started right after; it should receive order-0001 again (redelivered=True).
+
+===== queue while worker-1 holds order-0001 unacknowledged =====
+name	messages_ready	messages_unacknowledged	consumers
+orders	2	1	1
+
+===== queue just after worker-1 crashed (consumers back to 1, order-0001 now owned by worker-2) =====
+name	messages_ready	messages_unacknowledged	consumers
+orders	1	1	1
+
+# System keeps running: restart worker-1 normally and publish order-0004..0007.
+
+===== merged timeline =====
+22:05:09.074 [worker-1 pid=2121] waiting for messages on queue 'orders' (Ctrl+C to stop)
+22:05:11.094 [producer] published {"event_id": "cbe56a77-d205-4558-9973-c3a0629b0d7d", "order_id": "order-0001", "item_id": "item-200", "quantity": 4}
+22:05:11.094 [worker-1 pid=2121] RECEIVED  event_id=cbe56a77-d205-4558-9973-c3a0629b0d7d order_id=order-0001 item_id=item-200 qty=4
+22:05:11.094 [worker-1 pid=2121] PROCESSING order_id=order-0001 item_id=item-200 qty=4 ...
+22:05:11.095 [producer] published {"event_id": "3b225cc5-04f4-423d-bde5-077c1f7405fc", "order_id": "order-0002", "item_id": "item-400", "quantity": 4}
+22:05:11.098 [producer] published {"event_id": "d92f244c-3803-4292-be79-a7ec92dbecfb", "order_id": "order-0003", "item_id": "item-400", "quantity": 2}
+22:05:11.098 [producer] done: 3 message(s) published to queue 'orders'
+22:05:12.133 [worker-2 pid=2170] waiting for messages on queue 'orders' (Ctrl+C to stop)
+22:05:12.134 [worker-2 pid=2170] RECEIVED  event_id=3b225cc5-04f4-423d-bde5-077c1f7405fc order_id=order-0002 item_id=item-400 qty=4
+22:05:12.134 [worker-2 pid=2170] PROCESSING order_id=order-0002 item_id=item-400 qty=4 ...
+22:05:13.108 [worker-1 pid=2121] SIMULATED CRASH: exiting before ACK for event_id=cbe56a77-d205-4558-9973-c3a0629b0d7d (broker will redeliver it)
+22:05:13.136 [worker-2 pid=2170] DONE      order_id=order-0002 processed
+22:05:13.137 [worker-2 pid=2170] ACK       event_id=3b225cc5-04f4-423d-bde5-077c1f7405fc
+22:05:13.138 [worker-2 pid=2170] RECEIVED  event_id=cbe56a77-d205-4558-9973-c3a0629b0d7d order_id=order-0001 item_id=item-200 qty=4  [REDELIVERED]
+22:05:13.138 [worker-2 pid=2170] PROCESSING order_id=order-0001 item_id=item-200 qty=4 ...
+22:05:14.140 [worker-2 pid=2170] DONE      order_id=order-0001 processed
+22:05:14.140 [worker-2 pid=2170] ACK       event_id=cbe56a77-d205-4558-9973-c3a0629b0d7d
+22:05:14.140 [worker-2 pid=2170] RECEIVED  event_id=d92f244c-3803-4292-be79-a7ec92dbecfb order_id=order-0003 item_id=item-400 qty=2
+22:05:14.141 [worker-2 pid=2170] PROCESSING order_id=order-0003 item_id=item-400 qty=2 ...
+22:05:15.141 [worker-2 pid=2170] DONE      order_id=order-0003 processed
+22:05:15.141 [worker-2 pid=2170] ACK       event_id=d92f244c-3803-4292-be79-a7ec92dbecfb
+22:05:15.746 [worker-1-restarted pid=2297] waiting for messages on queue 'orders' (Ctrl+C to stop)
+22:05:17.738 [worker-2 pid=2170] RECEIVED  event_id=3a2a9c44-47f7-47c2-a903-0af0f94ec990 order_id=order-0004 item_id=item-100 qty=4
+22:05:17.739 [producer] published {"event_id": "3a2a9c44-47f7-47c2-a903-0af0f94ec990", "order_id": "order-0004", "item_id": "item-100", "quantity": 4}
+22:05:17.739 [producer] published {"event_id": "02ec44d0-d561-46df-8ebb-e29dacd209b8", "order_id": "order-0005", "item_id": "item-200", "quantity": 3}
+22:05:17.739 [worker-2 pid=2170] PROCESSING order_id=order-0004 item_id=item-100 qty=4 ...
+22:05:17.740 [producer] published {"event_id": "46febb3e-335c-4a81-8410-789d8c981181", "order_id": "order-0006", "item_id": "item-400", "quantity": 5}
+22:05:17.740 [worker-1-restarted pid=2297] RECEIVED  event_id=02ec44d0-d561-46df-8ebb-e29dacd209b8 order_id=order-0005 item_id=item-200 qty=3
+22:05:17.740 [worker-1-restarted pid=2297] PROCESSING order_id=order-0005 item_id=item-200 qty=3 ...
+22:05:17.741 [producer] published {"event_id": "f2611627-ea36-4aed-ae83-f9af0489d08e", "order_id": "order-0007", "item_id": "item-500", "quantity": 2}
+22:05:17.741 [producer] done: 4 message(s) published to queue 'orders'
+22:05:18.744 [worker-1-restarted pid=2297] DONE      order_id=order-0005 processed
+22:05:18.744 [worker-1-restarted pid=2297] ACK       event_id=02ec44d0-d561-46df-8ebb-e29dacd209b8
+22:05:18.744 [worker-2 pid=2170] DONE      order_id=order-0004 processed
+22:05:18.750 [worker-2 pid=2170] ACK       event_id=3a2a9c44-47f7-47c2-a903-0af0f94ec990
+22:05:18.751 [worker-1-restarted pid=2297] RECEIVED  event_id=46febb3e-335c-4a81-8410-789d8c981181 order_id=order-0006 item_id=item-400 qty=5
+22:05:18.751 [worker-1-restarted pid=2297] PROCESSING order_id=order-0006 item_id=item-400 qty=5 ...
+22:05:18.752 [worker-2 pid=2170] RECEIVED  event_id=f2611627-ea36-4aed-ae83-f9af0489d08e order_id=order-0007 item_id=item-500 qty=2
+22:05:18.752 [worker-2 pid=2170] PROCESSING order_id=order-0007 item_id=item-500 qty=2 ...
+22:05:19.754 [worker-1-restarted pid=2297] DONE      order_id=order-0006 processed
+22:05:19.754 [worker-1-restarted pid=2297] ACK       event_id=46febb3e-335c-4a81-8410-789d8c981181
+22:05:19.757 [worker-2 pid=2170] DONE      order_id=order-0007 processed
+22:05:19.757 [worker-2 pid=2170] ACK       event_id=f2611627-ea36-4aed-ae83-f9af0489d08e
+
+===== summary =====
+worker-1 received:               order-0001
+worker-1 ACKs sent:              0
+worker-2 got as redelivery:      order-0001
+order-0001 business action ran:  1 time(s)
+orders processed after restart:  worker-1-restarted order-0005, worker-1-restarted order-0006, worker-2 order-0004, worker-2 order-0007
+processed event_ids recorded:    7 (expected 7)
+
+===== queue at the end =====
+name	messages_ready	messages_unacknowledged	consumers
+orders	0	0	0

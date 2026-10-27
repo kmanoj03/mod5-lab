@@ -4,6 +4,7 @@ Usage:
     python worker.py --name worker-1
     python worker.py --name worker-2 --delay 2
     python worker.py --name worker-1 --crash-before-ack     # failure / redelivery demo
+    python worker.py --name worker-1 --crash-after-work     # redelivered duplicate demo
 
 Key behaviours
   * manual ACK, sent only after processing has finished
@@ -71,7 +72,8 @@ def business_action(order: dict, delay: float) -> None:
     time.sleep(delay)
 
 
-def make_callback(name: str, delay: float, crash_before_ack: bool, store: IdempotencyStore, log):
+def make_callback(store: IdempotencyStore, log, delay: float,
+                  crash_before_ack: bool = False, crash_after_work: bool = False):
     def on_message(channel, method, properties, body):
         redelivered = method.redelivered
         try:
@@ -112,6 +114,12 @@ def make_callback(name: str, delay: float, crash_before_ack: bool, store: Idempo
             store.mark_processed(event_id)   # record only after the work is done
             log.info("DONE      order_id=%s processed", order.get("order_id"))
 
+            if crash_after_work:
+                # Work is done and recorded, but the ACK never reaches the broker.
+                log.error("SIMULATED CRASH: work done but exiting before ACK for event_id=%s "
+                          "(redelivery will be a duplicate)", event_id)
+                os._exit(1)
+
         channel.basic_ack(method.delivery_tag)  # ACK strictly after processing finished
         log.info("ACK       event_id=%s", event_id)
 
@@ -124,13 +132,16 @@ def main() -> None:
     parser.add_argument("--delay", type=float, default=1.0, help="seconds of simulated work per order")
     parser.add_argument("--crash-before-ack", action="store_true",
                         help="die while handling the first message, before sending the ACK")
+    parser.add_argument("--crash-after-work", action="store_true",
+                        help="finish and record the first message, then die before sending the ACK")
     args = parser.parse_args()
 
     logging.basicConfig(
         level=logging.INFO,
-        format=f"%(asctime)s [{args.name} pid={os.getpid()}] %(message)s",
+        format=f"%(asctime)s.%(msecs)03d [{args.name} pid={os.getpid()}] %(message)s",
         datefmt="%H:%M:%S",
     )
+    logging.getLogger("pika").setLevel(logging.WARNING)
     log = logging.getLogger(args.name)
 
     store = IdempotencyStore(config.PROCESSED_FILE)
@@ -140,7 +151,11 @@ def main() -> None:
     channel.basic_qos(prefetch_count=1)  # one unacked message at a time per worker
     channel.basic_consume(
         queue=config.QUEUE_NAME,
-        on_message_callback=make_callback(args.name, args.delay, args.crash_before_ack, store, log),
+        on_message_callback=make_callback(
+            store, log, args.delay,
+            crash_before_ack=args.crash_before_ack,
+            crash_after_work=args.crash_after_work,
+        ),
         auto_ack=False,                   # manual acknowledgements
     )
 

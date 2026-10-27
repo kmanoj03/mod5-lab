@@ -1,0 +1,73 @@
+# Demo 1: successful processing + two competing consumers
+# worker-1 and worker-2 consume the same queue 'orders' (prefetch=1, manual ACK).
+# The producer publishes 10 orders; each order must be handled by exactly one worker.
+
+===== queue before publishing =====
+name	messages_ready	messages_unacknowledged	consumers
+orders	0	0	2
+
+===== merged timeline (producer + both workers) =====
+22:04:59.466 [worker-2 pid=1796] waiting for messages on queue 'orders' (Ctrl+C to stop)
+22:04:59.467 [worker-1 pid=1795] waiting for messages on queue 'orders' (Ctrl+C to stop)
+22:05:01.873 [producer] published {"event_id": "5cbbe8b6-bc62-440f-aae6-e0e696e1a47d", "order_id": "order-0001", "item_id": "item-100", "quantity": 5}
+22:05:01.873 [worker-1 pid=1795] RECEIVED  event_id=5cbbe8b6-bc62-440f-aae6-e0e696e1a47d order_id=order-0001 item_id=item-100 qty=5
+22:05:01.873 [worker-1 pid=1795] PROCESSING order_id=order-0001 item_id=item-100 qty=5 ...
+22:05:01.874 [producer] published {"event_id": "2bd7a5d8-59b9-43dd-9970-8c55282041b1", "order_id": "order-0002", "item_id": "item-500", "quantity": 2}
+22:05:01.874 [worker-2 pid=1796] RECEIVED  event_id=2bd7a5d8-59b9-43dd-9970-8c55282041b1 order_id=order-0002 item_id=item-500 qty=2
+22:05:01.874 [worker-2 pid=1796] PROCESSING order_id=order-0002 item_id=item-500 qty=2 ...
+22:05:01.875 [producer] published {"event_id": "b42608d3-c0df-47ad-bc36-1e11b79185c5", "order_id": "order-0003", "item_id": "item-500", "quantity": 1}
+22:05:01.876 [producer] published {"event_id": "8fba1774-508c-43f9-abae-9a6f69b5f506", "order_id": "order-0004", "item_id": "item-400", "quantity": 2}
+22:05:01.876 [producer] published {"event_id": "ddee65c1-1c6e-4751-a88b-373c56877311", "order_id": "order-0005", "item_id": "item-200", "quantity": 3}
+22:05:01.877 [producer] published {"event_id": "ddc7cf38-4346-415b-a1f6-8c3e0c8105e8", "order_id": "order-0006", "item_id": "item-300", "quantity": 4}
+22:05:01.878 [producer] published {"event_id": "8532c618-5aee-484c-99d1-6927f48ae061", "order_id": "order-0007", "item_id": "item-200", "quantity": 4}
+22:05:01.879 [producer] published {"event_id": "8dab5c31-a2e3-4a44-aef8-16d4c0986f0e", "order_id": "order-0008", "item_id": "item-400", "quantity": 2}
+22:05:01.880 [producer] published {"event_id": "83065746-8be1-4e95-ab2d-fde6fdea41a8", "order_id": "order-0009", "item_id": "item-500", "quantity": 5}
+22:05:01.880 [producer] published {"event_id": "fbfb4bf5-cd36-4902-a512-d12495343bf8", "order_id": "order-0010", "item_id": "item-100", "quantity": 1}
+22:05:01.881 [producer] done: 10 message(s) published to queue 'orders'
+22:05:02.875 [worker-1 pid=1795] DONE      order_id=order-0001 processed
+22:05:02.875 [worker-1 pid=1795] ACK       event_id=5cbbe8b6-bc62-440f-aae6-e0e696e1a47d
+22:05:02.877 [worker-1 pid=1795] RECEIVED  event_id=b42608d3-c0df-47ad-bc36-1e11b79185c5 order_id=order-0003 item_id=item-500 qty=1
+22:05:02.877 [worker-1 pid=1795] PROCESSING order_id=order-0003 item_id=item-500 qty=1 ...
+22:05:02.880 [worker-2 pid=1796] DONE      order_id=order-0002 processed
+22:05:02.880 [worker-2 pid=1796] ACK       event_id=2bd7a5d8-59b9-43dd-9970-8c55282041b1
+22:05:02.881 [worker-2 pid=1796] RECEIVED  event_id=8fba1774-508c-43f9-abae-9a6f69b5f506 order_id=order-0004 item_id=item-400 qty=2
+22:05:02.881 [worker-2 pid=1796] PROCESSING order_id=order-0004 item_id=item-400 qty=2 ...
+22:05:03.882 [worker-1 pid=1795] DONE      order_id=order-0003 processed
+22:05:03.882 [worker-1 pid=1795] ACK       event_id=b42608d3-c0df-47ad-bc36-1e11b79185c5
+22:05:03.887 [worker-2 pid=1796] DONE      order_id=order-0004 processed
+22:05:03.889 [worker-1 pid=1795] RECEIVED  event_id=ddee65c1-1c6e-4751-a88b-373c56877311 order_id=order-0005 item_id=item-200 qty=3
+22:05:03.889 [worker-1 pid=1795] PROCESSING order_id=order-0005 item_id=item-200 qty=3 ...
+22:05:03.889 [worker-2 pid=1796] ACK       event_id=8fba1774-508c-43f9-abae-9a6f69b5f506
+22:05:03.890 [worker-2 pid=1796] RECEIVED  event_id=ddc7cf38-4346-415b-a1f6-8c3e0c8105e8 order_id=order-0006 item_id=item-300 qty=4
+22:05:03.891 [worker-2 pid=1796] PROCESSING order_id=order-0006 item_id=item-300 qty=4 ...
+22:05:04.891 [worker-1 pid=1795] DONE      order_id=order-0005 processed
+22:05:04.891 [worker-1 pid=1795] ACK       event_id=ddee65c1-1c6e-4751-a88b-373c56877311
+22:05:04.893 [worker-1 pid=1795] RECEIVED  event_id=8532c618-5aee-484c-99d1-6927f48ae061 order_id=order-0007 item_id=item-200 qty=4
+22:05:04.893 [worker-1 pid=1795] PROCESSING order_id=order-0007 item_id=item-200 qty=4 ...
+22:05:04.894 [worker-2 pid=1796] DONE      order_id=order-0006 processed
+22:05:04.894 [worker-2 pid=1796] ACK       event_id=ddc7cf38-4346-415b-a1f6-8c3e0c8105e8
+22:05:04.894 [worker-2 pid=1796] RECEIVED  event_id=8dab5c31-a2e3-4a44-aef8-16d4c0986f0e order_id=order-0008 item_id=item-400 qty=2
+22:05:04.894 [worker-2 pid=1796] PROCESSING order_id=order-0008 item_id=item-400 qty=2 ...
+22:05:05.899 [worker-1 pid=1795] DONE      order_id=order-0007 processed
+22:05:05.901 [worker-1 pid=1795] ACK       event_id=8532c618-5aee-484c-99d1-6927f48ae061
+22:05:05.901 [worker-2 pid=1796] DONE      order_id=order-0008 processed
+22:05:05.902 [worker-1 pid=1795] RECEIVED  event_id=83065746-8be1-4e95-ab2d-fde6fdea41a8 order_id=order-0009 item_id=item-500 qty=5
+22:05:05.902 [worker-2 pid=1796] ACK       event_id=8dab5c31-a2e3-4a44-aef8-16d4c0986f0e
+22:05:05.903 [worker-1 pid=1795] PROCESSING order_id=order-0009 item_id=item-500 qty=5 ...
+22:05:05.903 [worker-2 pid=1796] RECEIVED  event_id=fbfb4bf5-cd36-4902-a512-d12495343bf8 order_id=order-0010 item_id=item-100 qty=1
+22:05:05.903 [worker-2 pid=1796] PROCESSING order_id=order-0010 item_id=item-100 qty=1 ...
+22:05:06.908 [worker-1 pid=1795] DONE      order_id=order-0009 processed
+22:05:06.908 [worker-1 pid=1795] ACK       event_id=83065746-8be1-4e95-ab2d-fde6fdea41a8
+22:05:06.908 [worker-2 pid=1796] DONE      order_id=order-0010 processed
+22:05:06.908 [worker-2 pid=1796] ACK       event_id=fbfb4bf5-cd36-4902-a512-d12495343bf8
+
+===== summary =====
+worker-1 processed 5 orders: order-0001 order-0003 order-0005 order-0007 order-0009
+worker-2 processed 5 orders: order-0002 order-0004 order-0006 order-0008 order-0010
+orders published:          10
+orders processed (total):  10
+distinct order_ids done:   10
+
+===== queue after processing =====
+name	messages_ready	messages_unacknowledged	consumers
+orders	0	0	0
