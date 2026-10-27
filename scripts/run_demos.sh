@@ -4,8 +4,7 @@
 #   ./scripts/run_demos.sh            # all demos
 #   ./scripts/run_demos.sh 2          # only demo 2
 #
-# Requires a running broker. With Docker set:
-#   RABBITMQCTL="docker exec mod5-rabbitmq rabbitmqctl" ./scripts/run_demos.sh
+# Requires a running RabbitMQ broker and `rabbitmqctl` on PATH.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

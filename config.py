@@ -1,7 +1,6 @@
 """Shared settings for the producer and the workers.
 
-Everything can be overridden with environment variables so the same code
-works against Docker, a Homebrew install, or a remote broker.
+Everything can be overridden with environment variables.
 """
 import os
 
