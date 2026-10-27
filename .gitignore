@@ -4,4 +4,4 @@ __pycache__/
 .DS_Store
 # runtime state (the shared idempotency store is created at run time)
 processed_events.txt
-processed_events.txt.lock
+processed_events.txt.locks/
